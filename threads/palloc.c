@@ -1,4 +1,4 @@
-#include "threads/palloc.h"
+#include "palloc.h"
 #include <bitmap.h>
 #include <debug.h>
 #include <round.h>
