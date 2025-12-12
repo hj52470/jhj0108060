@@ -100,6 +100,17 @@ palloc_get_multiple (enum palloc_flags flags, size_t page_cnt)
     return pages;
 }
 
+enum palloc_mode {
+  PAL_FIRST_FIT,
+  PAL_NEXT_FIT,
+  PAL_BEST_FIT,
+  PAL_BUDDY
+};
+
+void palloc_set_mode(enum palloc_mode mode);
+
+
+
 /* Obtains a single free page and returns its kernel virtual
    address.
    If PAL_USER is set, the page is obtained from the user pool,
