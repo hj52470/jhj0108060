@@ -16,6 +16,11 @@ void bitmap_destroy (struct bitmap *);
 /* Bitmap size. */
 size_t bitmap_size (const struct bitmap *);
 
+
+size_t bitmap_scan_and_flip_next_fit(struct bitmap *b, size_t *start,
+                                     size_t cnt, bool value);
+size_t bitmap_scan_and_flip_best_fit(struct bitmap *b, size_t cnt, bool value);
+
 /* Setting and testing single bits. */
 void bitmap_set (struct bitmap *, size_t idx, bool);
 void bitmap_mark (struct bitmap *, size_t idx);
