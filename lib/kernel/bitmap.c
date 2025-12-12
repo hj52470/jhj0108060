@@ -393,32 +393,74 @@ bitmap_scan_and_flip_next_fit(struct bitmap *b, size_t *start,
   }
   return idx;
 }
+size_t
+bitmap_scan_and_flip_next_fit (struct bitmap *b, size_t *start,
+                               size_t cnt, bool value)
+{
+  size_t size = bitmap_size (b);
+  size_t s = start ? *start : 0;
+  size_t idx;
+
+  if (cnt == 0 || size == 0)
+    return BITMAP_ERROR;
+
+  if (s >= size)
+    s = 0;
+
+  idx = bitmap_scan (b, s, cnt, value);
+  if (idx == BITMAP_ERROR && s != 0)
+    idx = bitmap_scan (b, 0, cnt, value);
+
+  if (idx != BITMAP_ERROR)
+    {
+      bitmap_set_multiple (b, idx, cnt, !value);
+      if (start)
+        {
+          size_t next = idx + cnt;
+          *start = (next < size) ? next : 0;
+        }
+    }
+
+  return idx;
+}
 
 size_t
-bitmap_scan_and_flip_best_fit(struct bitmap *b, size_t cnt, bool value)
+bitmap_scan_and_flip_best_fit (struct bitmap *b, size_t cnt, bool value)
 {
-  size_t size = bitmap_size(b);
+  size_t size = bitmap_size (b);
   size_t best_idx = BITMAP_ERROR;
   size_t best_len = SIZE_MAX;
 
   size_t i = 0;
-  while (i < size) {
-    if (bitmap_test(b, i) != value) { i++; continue; }
+  while (i < size)
+    {
+      if (bitmap_test (b, i) != value)
+        {
+          i++;
+          continue;
+        }
 
-    size_t j = i;
-    while (j < size && bitmap_test(b, j) == value) j++;
-    size_t run_len = j - i;
+      size_t j = i;
+      while (j < size && bitmap_test (b, j) == value)
+        j++;
 
-    if (run_len >= cnt && run_len < best_len) {
-      best_len = run_len;
-      best_idx = i;
-      if (best_len == cnt) break;
+      size_t run_len = j - i;
+
+      if (run_len >= cnt && run_len < best_len)
+        {
+          best_len = run_len;
+          best_idx = i;
+          if (best_len == cnt)
+            break;
+        }
+
+      i = j;
     }
-    i = j;
-  }
 
   if (best_idx != BITMAP_ERROR)
-    bitmap_set_multiple(b, best_idx, cnt, !value);
+    bitmap_set_multiple (b, best_idx, cnt, !value);
 
   return best_idx;
 }
+
+
