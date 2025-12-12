@@ -1,6 +1,7 @@
 #include "bitmap.h"
 #include <debug.h>
 #include <limits.h>
+#include <stdint.h>
 #include <round.h>
 #include <stdio.h>
 #include "threads/malloc.h"
