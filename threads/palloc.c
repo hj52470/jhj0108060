@@ -4,7 +4,6 @@
 #include <round.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <string.h>
 #include "threads/loader.h"
 #include "threads/synch.h"
@@ -27,7 +26,7 @@ static void init_pool (struct pool *, void *base, size_t page_cnt,
                        const char *name);
 static bool page_from_pool (const struct pool *, void *page);
 
-/* Mode selector (global). */
+/* Current allocation mode. */
 static enum palloc_mode cur_mode = PAL_FIRST_FIT;
 
 void
@@ -38,13 +37,17 @@ palloc_set_mode (enum palloc_mode mode)
   user_pool.next_fit_start = 0;
 }
 
-/* round up to power-of-two (buddy size) */
+/* Round up N to the nearest power of two (for buddy allocation). */
 static size_t
 buddy_round_up (size_t n)
 {
   size_t k = 1;
   while (k < n)
-    k <<= 1;
+    {
+      if (k > SIZE_MAX / 2)
+        return n;               /* safety guard */
+      k <<= 1;
+    }
   return k;
 }
 
@@ -67,7 +70,7 @@ palloc_init (size_t user_page_limit)
              user_pages, "user pool");
 }
 
-/* Obtains and returns a group of PAGE_CNT contiguous free pages. */
+/* Obtains and returns PAGE_CNT contiguous free pages. */
 void *
 palloc_get_multiple (enum palloc_flags flags, size_t page_cnt)
 {
@@ -103,7 +106,7 @@ palloc_get_multiple (enum palloc_flags flags, size_t page_cnt)
       break;
 
     case PAL_BUDDY:
-      /* "Buddy" = allocate in 2^k size, still using bitmap first-fit */
+      /* Buddy: allocate 2^k pages using bitmap first-fit */
       page_idx = bitmap_scan_and_flip (pool->used_map, 0, req_cnt, false);
       break;
 
@@ -140,7 +143,7 @@ palloc_get_page (enum palloc_flags flags)
   return palloc_get_multiple (flags, 1);
 }
 
-/* Frees the PAGE_CNT pages starting at PAGES. */
+/* Frees PAGE_CNT pages starting at PAGES. */
 void
 palloc_free_multiple (void *pages, size_t page_cnt)
 {
@@ -161,13 +164,13 @@ palloc_free_multiple (void *pages, size_t page_cnt)
 
   page_idx = pg_no (pages) - pg_no (pool->base);
 
-#ifndef NDEBUG
-  memset (pages, 0xcc, PGSIZE * page_cnt);
-#endif
-
   free_cnt = page_cnt;
   if (cur_mode == PAL_BUDDY)
     free_cnt = buddy_round_up (page_cnt);
+
+#ifndef NDEBUG
+  memset (pages, 0xcc, PGSIZE * free_cnt);
+#endif
 
   lock_acquire (&pool->lock);
   ASSERT (bitmap_all (pool->used_map, page_idx, free_cnt));
@@ -175,14 +178,14 @@ palloc_free_multiple (void *pages, size_t page_cnt)
   lock_release (&pool->lock);
 }
 
-/* Frees the page at PAGE. */
+/* Frees a single page. */
 void
 palloc_free_page (void *page)
 {
   palloc_free_multiple (page, 1);
 }
 
-/* Initializes pool P as starting at BASE with PAGE_CNT pages. */
+/* Initializes pool P. */
 static void
 init_pool (struct pool *p, void *base, size_t page_cnt, const char *name)
 {
@@ -191,17 +194,15 @@ init_pool (struct pool *p, void *base, size_t page_cnt, const char *name)
     PANIC ("Not enough memory in %s for bitmap.", name);
   page_cnt -= bm_pages;
 
-  /* 제출 전 반드시 출력 제거 */
-  /* printf ("%zu pages available in %s.\n", page_cnt, name); */
+  /* IMPORTANT: do not print anything here (grading will fail). */
 
   lock_init (&p->lock);
   p->used_map = bitmap_create_in_buf (page_cnt, base, bm_pages * PGSIZE);
   p->base = (uint8_t *) base + bm_pages * PGSIZE;
-
   p->next_fit_start = 0;
 }
 
-/* Returns true if PAGE was allocated from POOL. */
+/* Returns true if PAGE belongs to POOL. */
 static bool
 page_from_pool (const struct pool *pool, void *page)
 {
