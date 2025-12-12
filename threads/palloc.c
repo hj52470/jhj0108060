@@ -29,6 +29,86 @@ static bool page_from_pool (const struct pool *, void *page);
 /* Current allocation mode. */
 static enum palloc_mode cur_mode = PAL_FIRST_FIT;
 
+/* Next Fit implementation */
+static size_t
+bitmap_scan_and_flip_next_fit (struct bitmap *b, size_t *start, 
+                               size_t cnt, bool value)
+{
+  size_t page_idx;
+  size_t bitmap_size_val = bitmap_size (b);
+  
+  ASSERT (b != NULL);
+  ASSERT (cnt <= bitmap_size_val);
+  
+  /* Try from start position to end */
+  page_idx = bitmap_scan (b, *start, cnt, value);
+  
+  /* If not found, wrap around to beginning */
+  if (page_idx == BITMAP_ERROR && *start > 0)
+    page_idx = bitmap_scan (b, 0, cnt, value);
+  
+  /* If found, flip bits and update start position */
+  if (page_idx != BITMAP_ERROR)
+    {
+      bitmap_set_multiple (b, page_idx, cnt, !value);
+      *start = (page_idx + cnt) % bitmap_size_val;
+    }
+  
+  return page_idx;
+}
+
+/* Best Fit implementation */
+static size_t
+bitmap_scan_and_flip_best_fit (struct bitmap *b, size_t cnt, bool value)
+{
+  size_t best_idx = BITMAP_ERROR;
+  size_t best_size = BITMAP_ERROR;
+  size_t i = 0;
+  size_t bitmap_size_val = bitmap_size (b);
+  
+  ASSERT (b != NULL);
+  ASSERT (cnt > 0);
+  
+  /* Scan entire bitmap to find best fit */
+  while (i < bitmap_size_val)
+    {
+      /* Check if current position has the target value */
+      if (bitmap_test (b, i) == value)
+        {
+          size_t start = i;
+          size_t len = 0;
+          
+          /* Count consecutive bits with target value */
+          while (i < bitmap_size_val && bitmap_test (b, i) == value)
+            {
+              len++;
+              i++;
+            }
+          
+          /* Update best if this block fits and is smaller than current best */
+          if (len >= cnt && len < best_size)
+            {
+              best_idx = start;
+              best_size = len;
+              
+              /* If exact match, stop searching */
+              if (len == cnt)
+                break;
+            }
+        }
+      else
+        {
+          i++;
+        }
+    }
+  
+  /* If found, flip the bits */
+  if (best_idx != BITMAP_ERROR)
+    bitmap_set_multiple (b, best_idx, cnt, !value);
+  
+  return best_idx;
+}
+
 void
 palloc_set_mode (enum palloc_mode mode)
 {
@@ -212,4 +292,3 @@ page_from_pool (const struct pool *pool, void *page)
 
   return page_no >= start_page && page_no < end_page;
 }
-
