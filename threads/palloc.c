@@ -25,25 +25,24 @@
    half to the user pool.  That should be huge overkill for the
    kernel pool, but that's just fine for demonstration purposes. */
 
-/* A memory pool. */
+
 struct pool {
-    struct lock lock;        /* Mutual exclusion. */
-    struct bitmap *used_map; /* Bitmap of free pages. */
-    uint8_t *base;           /* Base of pool. */
-    size_t next_fit_pos;     /* Next fit starting position. */
+    struct lock lock;       
+    struct bitmap *used_map; 
+    uint8_t *base;          
+    size_t next_fit_pos;    
 };
 
-/* Two pools: one for kernel data, one for user pages. */
 static struct pool kernel_pool, user_pool;
 
 static void init_pool(struct pool *, void *base, size_t page_cnt,
                       const char *name);
 static bool page_from_pool(const struct pool *, void *page);
 
-/* Current allocation mode. */
+
 static enum palloc_mode palloc_mode = PAL_FIRST_FIT;
 
-/* Sets the allocation mode. */
+
 void
 palloc_set_mode (enum palloc_mode mode)
 {
@@ -52,7 +51,6 @@ palloc_set_mode (enum palloc_mode mode)
   user_pool.next_fit_pos = 0;
 }
 
-/* Helper: Round up to next power of 2 */
 static size_t
 round_up_pow2 (size_t n)
 {
@@ -62,7 +60,6 @@ round_up_pow2 (size_t n)
   return result;
 }
 
-/* Helper: Calculate log2 of n (ceiling) */
 static size_t
 log2_ceil (size_t n)
 {
@@ -76,7 +73,6 @@ log2_ceil (size_t n)
   return order;
 }
 
-/* Next Fit: scan from last position, wrap around if needed */
 static size_t
 next_fit_scan (struct bitmap *map, size_t *pos, size_t cnt)
 {
